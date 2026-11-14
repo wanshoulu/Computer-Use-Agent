@@ -57,7 +57,11 @@ UPSTREAM-METADATA.txt            # wheel METADATA 原文（版本与依赖溯源
 | `server/cua_server/services/hermes_bridge.py` | Hermes 进程桥（stdin/stdout JSON 协议） | Apache-2.0 |
 | `server/cua_server/services/hermes_pool.py` | Hermes 进程池（会话隔离/空闲回收/崩溃重建） | Apache-2.0 |
 | `server/cua_server/services/model_config.py` | 模型凭据解析（env / providers.json） | Apache-2.0 |
-| `server/cua_server/web/index.html` | Web 控制台（聊天 + 执行时间线 + 录制流程弹窗，零依赖单文件） | Apache-2.0 |
+| `server/cua_server/web/index.html` | 极简控制台（零依赖单文件） | Apache-2.0 |
+| `server/cua_server/services/teach_recorder.py` | 示教录制器：CDP 注入钩子捕获用户操作 → sendBeacon 上报 → 生成 SOP 与回放命令 | Apache-2.0 |
+| `server/cua_server/services/replay_engine.py` | 确定性回放引擎（零 LLM）+ 多策略自愈 + 看门狗 | Apache-2.0 |
+| `server/cua_server/services/sentinel_scheduler.py` | 「录一次，天天跑」定时调度 | Apache-2.0 |
+| `webapp/AgentComputerUse.tsx` + `.css` | 完整 Web 应用前端（React + AntD）：会话管理、7 个预置金融场景卡片、实时浏览器画面、执行时间线、录制面板、回放库 | Apache-2.0 |
 | `demo/` | 最小 CDP 闭环冒烟（轨迹 JSON） | Apache-2.0 |
 | `docs/` | 架构文档与截图 | Apache-2.0 |
 

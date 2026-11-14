@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from cua_server.routes import tasks
+from cua_server.routes import browser_task
 from cua_server.utils.logger import setup_logging
 
 WEB_DIR = Path(__file__).parent / "web"
@@ -37,7 +37,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.include_router(tasks.router, prefix="/api", tags=["tasks"])
+    app.include_router(browser_task.router, prefix="/agent/browser", tags=["tasks"])
 
     @app.get("/health")
     async def health() -> dict:

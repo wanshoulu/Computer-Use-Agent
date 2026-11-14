@@ -32,6 +32,7 @@ class TaskState(str, Enum):
     EXECUTING = "executing"
     WAITING_USER = "waiting_user"
     SUCCEEDED = "succeeded"
+    PARTIAL = "partial"
     FAILED = "failed"
     CANCELLED = "cancelled"
 
@@ -108,6 +109,7 @@ class TaskManager:
 
     def __init__(self):
         self._tasks: Dict[str, Task] = {}
+        self._async_tasks: Dict[str, asyncio.Task] = {}
         self._lock = asyncio.Lock()
 
     async def create_task(
@@ -135,24 +137,25 @@ class TaskManager:
             self._tasks[task_id] = task
 
         # 异步启动任务执行
-        asyncio.create_task(self._run_task(task))
+        async_task = asyncio.create_task(self._run_task(task))
+        self._async_tasks[task_id] = async_task
         return task
 
     async def _run_task(self, task: Task):
         """任务状态机驱动：planning → executing，消费 pool.chat() 事件流"""
         try:
             task.state = TaskState.PLANNING
-            task.push_event({"type": "state", "state": "planning", "task_id": task.task_id})
+            task.push_event({"type": "state", "state": "planning", "task_id": task.task_id, "session_id": task.session_id})
 
             # 检查取消
             if task._cancel_event.is_set():
                 task.state = TaskState.CANCELLED
-                task.push_event({"type": "done", "state": "cancelled", "task_id": task.task_id})
+                task.push_event({"type": "done", "state": "cancelled", "task_id": task.task_id, "session_id": task.session_id})
                 return
 
             # 解析模型配置
-            from cua_server.services.model_config import resolve_model_config, write_hermes_config
-            model_config = await resolve_model_config(task.model)
+            from cua_server.routes.hermes import _resolve_model_config, _write_hermes_config
+            model_config = await _resolve_model_config(task.model)
             if not model_config or not model_config.get("api_key"):
                 task.state = TaskState.FAILED
                 task.error = f"模型配置无效: {task.model}"
@@ -160,7 +163,7 @@ class TaskManager:
                 task.push_event({"type": "done", "state": "failed", "task_id": task.task_id})
                 return
 
-            write_hermes_config(model_config)
+            _write_hermes_config(model_config)
 
             task.state = TaskState.EXECUTING
             task.push_event({"type": "state", "state": "executing", "task_id": task.task_id})
@@ -218,6 +221,7 @@ class TaskManager:
                         "task_id": task.task_id,
                         "step_id": step.step_id,
                         "name": step.name,
+                        "cursor": event.get("cursor"),
                         "message": event.get("message", ""),
                     })
 
@@ -236,6 +240,8 @@ class TaskManager:
                         "name": event.get("name", ""),
                         "duration_ms": event.get("duration_ms"),
                         "success": event.get("success", True),
+                        # 失败原因透传给前端，用于生成用户可读的提示
+                        "error": (event.get("error") or "")[:200],
                     })
                     # P6: 审计日志
                     get_audit_logger().log(
@@ -248,6 +254,11 @@ class TaskManager:
 
                 elif event_type == "token":
                     content = event.get("content", "")
+                    # 防 LLM 流偶发结构化 delta（dict/list）混入 join 崩任务
+                    if isinstance(content, (dict, list)):
+                        content = json.dumps(content, ensure_ascii=False)
+                    elif content is not None and not isinstance(content, str):
+                        content = str(content)
                     if content:
                         full_response_parts.append(content)
                         task.push_event({
@@ -267,44 +278,70 @@ class TaskManager:
                 elif event_type == "result":
                     if event.get("status") == "ok":
                         response_text = event.get("response") or ""
+                        if isinstance(response_text, (dict, list)):
+                            response_text = json.dumps(response_text, ensure_ascii=False)
+                        elif response_text is not None and not isinstance(response_text, str):
+                            response_text = str(response_text)
                         if response_text and not full_response_parts:
                             full_response_parts.append(response_text)
-                        task.conclusion = "".join(full_response_parts)
-                        task.state = TaskState.SUCCEEDED
+                        task.conclusion = "".join(
+                            p if isinstance(p, str) else json.dumps(p, ensure_ascii=False)
+                            for p in full_response_parts)
+                        # 假完成检测：任务名义成功但输出是「请用户自己操作」式的推诿
+                        # （没有真实数据），标记 partial 让前端提示，避免误导用户。
+                        try:
+                            low = task.conclusion or ""
+                            dodged = any(k in low for k in (
+                                "请手动访问", "请提供正确", "请告知下一步",
+                                "以便我能更好地帮助您", "请手动查看",
+                                "如果需要进一步的帮助", "请提供更多信息",
+                                "请检查提供的网址", "无法访问指定的网址",
+                                "请告知如何操作", "请确认.*是否正确",
+                            )) or ("无法访问" in low and "请" in low)
+                            if dodged:
+                                task.state = TaskState.PARTIAL
+                                task.error = "疑似未获取到数据：Agent 输出为操作指引而非结果数据"
+                                logger.warning(f"[TaskManager] Task {task.task_id} 疑似假完成（输出含推诿文案），已标记 partial")
+                        except Exception:
+                            pass
+                        if task.state != TaskState.PARTIAL:
+                            task.state = TaskState.SUCCEEDED
                         task.push_event({
                             "type": "content",
                             "task_id": task.task_id,
                             "content": task.conclusion,
                             "status": "response_complete",
                         })
-                        task.push_event({"type": "done", "state": "succeeded", "task_id": task.task_id})
+                        task.push_event({"type": "done", "state": "succeeded", "task_id": task.task_id, "session_id": task.session_id})
                     else:
                         task.state = TaskState.FAILED
                         task.error = event.get("error", "Unknown error")
                         task.push_event({"type": "error", "error": task.error, "task_id": task.task_id})
-                        task.push_event({"type": "done", "state": "failed", "task_id": task.task_id})
+                        task.push_event({"type": "done", "state": "failed", "task_id": task.task_id, "session_id": task.session_id})
                     return
 
                 elif event_type == "error":
                     task.state = TaskState.FAILED
                     task.error = event.get("error", "Unknown error")
                     task.push_event({"type": "error", "error": task.error, "task_id": task.task_id})
-                    task.push_event({"type": "done", "state": "failed", "task_id": task.task_id})
+                    task.push_event({"type": "done", "state": "failed", "task_id": task.task_id, "session_id": task.session_id})
                     return
 
         except asyncio.CancelledError:
             task.state = TaskState.CANCELLED
-            task.push_event({"type": "done", "state": "cancelled", "task_id": task.task_id})
+            task.push_event({"type": "done", "state": "cancelled", "task_id": task.task_id, "session_id": task.session_id})
             raise
         except Exception as e:
             logger.error(f"[TaskManager] Task {task.task_id} crashed: {e}", exc_info=True)
             task.state = TaskState.FAILED
             task.error = str(e)
             task.push_event({"type": "error", "error": str(e), "task_id": task.task_id})
-            task.push_event({"type": "done", "state": "failed", "task_id": task.task_id})
+            task.push_event({"type": "done", "state": "failed", "task_id": task.task_id, "session_id": task.session_id})
+        finally:
+            self._async_tasks.pop(task.task_id, None)
 
     async def cancel_task(self, task_id: str) -> bool:
-        """取消任务 — 设置 _cancel_event"""
+        """取消任务 — 设置 _cancel_event 并中断 asyncio.Task"""
         task = self._tasks.get(task_id)
         if task is None:
             return False
@@ -312,7 +349,11 @@ class TaskManager:
             return False  # 已结束，不能取消
         task._cancel_event.set()
         task.state = TaskState.CANCELLED
-        task.push_event({"type": "done", "state": "cancelled", "task_id": task.task_id})
+        # 中断正在运行的 asyncio.Task，触发 CancelledError
+        async_task = self._async_tasks.pop(task_id, None)
+        if async_task and not async_task.done():
+            async_task.cancel()
+        task.push_event({"type": "done", "state": "cancelled", "task_id": task.task_id, "session_id": task.session_id})
         logger.info(f"[TaskManager] Task {task_id} cancelled by user")
         return True
 
@@ -350,7 +391,20 @@ class TaskManager:
         return self._tasks.get(task_id)
 
     def list_tasks(self) -> List[Task]:
+        self._cleanup_finished_tasks()
         return list(self._tasks.values())
+
+    def _cleanup_finished_tasks(self, max_keep: int = 50):
+        """清理已完成的旧任务，保留最近 max_keep 条"""
+        finished_states = (TaskState.SUCCEEDED, TaskState.FAILED, TaskState.CANCELLED)
+        finished = [(tid, t) for tid, t in self._tasks.items() if t.state in finished_states]
+        if len(finished) <= max_keep:
+            return
+        # 按创建时间排序，删除最旧的
+        finished.sort(key=lambda x: x[1].created_at)
+        for tid, _ in finished[:-max_keep]:
+            self._tasks.pop(tid, None)
+            self._async_tasks.pop(tid, None)
 
 
 # 全局单例
