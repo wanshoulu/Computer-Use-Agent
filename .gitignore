@@ -1,0 +1,7 @@
+# demo 运行产物
+demo/.chrome-profile/
+demo/.chrome-hires/
+demo/trajectory.json
+demo/demo-run.png
+__pycache__/
+*.pyc

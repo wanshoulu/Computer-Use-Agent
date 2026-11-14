@@ -1,0 +1,16 @@
+{
+  "id": "app-demo-replay (21e2937a-5c32-4281-ad72-13322c59e6f1)",
+  "tenantId": "default",
+  "name": "示教测试应用",
+  "type": "COMPUTER_USE",
+  "status": "ACTIVE",
+  "modelKey": "a2a7c8f5e-3b4d-4e6a-9c8b-1f2e3d4a5b6c::qwen-plus",
+  "knowledgeBaseIds": [],
+  "systemPrompt": null,
+  "taughtSteps": [
+    "打开页面 https://example.com",
+    "点击「More information...」链接",
+    "报告新页面的标题"
+  ],
+  "retrievalConfig": {}
+}
