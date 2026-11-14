@@ -20,6 +20,8 @@
 
 > 中文文档见下。Browser toolchain from [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) (MIT); server, CDP driver, and web console are original work in this repo.
 
+![Teach & replay in action: 3 recorded steps → the agent executes them (click → type "北向资金" → submit → assert echoed output)](docs/demo-teach-replay.gif)
+
 ---
 **Computer Use Agent** 是一个「示教回放」式网页自动化工具：把你在页面上要做的操作登记为步骤（录制流程），生成示教 SOP，Agent 就按录制的流程自动执行任务——元素找不到时用页面快照重新定位，遇到验证码暂停，每一步留截图与审计。
 
