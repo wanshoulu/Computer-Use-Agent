@@ -6,3 +6,5 @@ demo/demo-run.png
 __pycache__/
 *.pyc
 server/logs/
+.shot-*/
+docs/.shot-*/
