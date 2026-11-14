@@ -20,6 +20,8 @@ jobs:
           sudo apt-get update && sudo apt-get install -y google-chrome-stable
       - run: pip install websockets
       - name: Run CDP closed-loop smoke test
+        env:
+          CUA_CHROME_FLAGS: --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage
         run: |
           python demo/run_demo.py \
             --chrome /usr/bin/google-chrome \

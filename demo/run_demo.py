@@ -185,12 +185,15 @@ def main() -> int:
     chrome_proc = None
     if not args.attach:
         chrome = args.chrome or find_chrome()
+        # Extra flags via env (CI needs --headless=new --no-sandbox; local runs add none)
+        extra_flags = [f for f in os.environ.get("CUA_CHROME_FLAGS", "").split() if f]
         chrome_proc = subprocess.Popen(
             [chrome,
              f"--remote-debugging-port={args.cdp_port}",
              "--user-data-dir=" + os.path.join(HERE, ".chrome-profile"),
-             "--no-first-run", "--no-default-browser-check", "about:blank"],
+             "--no-first-run", "--no-default-browser-check", *extra_flags, "about:blank"],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
         )
         wait_cdp(args.cdp_port)
 
