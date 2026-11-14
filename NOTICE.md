@@ -53,10 +53,17 @@ UPSTREAM-METADATA.txt            # wheel METADATA 原文（版本与依赖溯源
 | `ontomind-app/migrations/` | `agent_app` 表 DDL 摘录与 COMPUTER_USE 种子 SQL | Apache-2.0 |
 | `demo/` | 无平台依赖的 CDP 闭环 demo | Apache-2.0 |
 | `docs/` | 架构文档与截图 | Apache-2.0 |
+| `ontomind-app/agent-runtime/` | Computer Use Agent 服务端实现（8 文件 2,298 行：任务状态机 / CDP 驱动 / Hermes 进程桥 / 提示词约束与安全策略） | Apache-2.0 |
 
 自研部分的事实来源：OntoMind 智能体应用平台（AI Harbor 知识建设域）
 的生产 PostgreSQL 数据（`agent_app` 表，2026-11-12 快照）与其 Flyway migration
 （V53/V56）。
+
+**agent-runtime 的恢复说明**：这 8 个文件在本机工作区源码树中已缺失，本仓库从
+Docker 容器镜像层（`ontomind/agent:cloud`，containerd snapshot 29731，文件时间
+2026-11-04）逐字节提取恢复，与生产容器内运行的代码一致。这就是平台
+「Computer Use Agent」应用（`POST /api/v1/agent-apps/app-computer-use/invoke` 与
+`POST /agent/browser/tasks`）背后真正的服务端实现。
 
 ## 3. 数据说明
 

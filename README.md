@@ -102,7 +102,16 @@ Computer-Use-Agent/
 │   ├── LICENSE                    上游 MIT 许可证原文
 │   └── UPSTREAM-METADATA.txt      wheel METADATA（版本/依赖溯源）
 ├── ontomind-app/                  📱 平台集成层（自研）
-│   ├── apps/                      生产 agent_app 表 COMPUTER_USE 记录还原（JSON）
+│   ├── agent-runtime/             🔥 Computer Use Agent 服务端实现（8 文件 2,298 行，从容器镜像恢复）
+│   │   ├── browser_task.py        任务化 API：POST /tasks（SSE 生命周期）/ cancel / audit
+│   │   ├── task_manager.py        任务状态机：queued→planning→executing→waiting_user→done，20s ping，真实取消
+│   │   ├── task_policy.py         审计日志与策略（P6）
+│   │   ├── computer_use_system.py 提示词约束 + 工具白名单 + 危险操作拦截（支付/删除/确认）+ 30 次调用上限
+│   │   ├── browser_driver.py      CDP 确定性浏览器驱动（标签页/导航/截图/断线恢复，非 LLM）
+│   │   ├── hermes_bridge.py       Hermes 进程桥（stdin/stdout JSON 协议：init/chat/ping/shutdown）
+│   │   ├── hermes_pool.py         Hermes Agent 进程池（会话隔离、每指纹独立 workspace）
+│   │   └── main.py                FastAPI 装配：/agent/browser 前缀挂载 browser_task 路由
+│   ├── apps/                      生产 agent_app 表 COMPUTER_USE 记录还原（JSON，含金融示教 E2E 闭环）
 │   └── migrations/                agent_app 表 DDL + COMPUTER_USE 种子 SQL
 ├── demo/                          🧪 4 行命令可跑的闭环 demo（无平台依赖）
 ├── docs/
@@ -189,7 +198,13 @@ sequenceDiagram
 | `browser_supervisor.py` | 1,475 | Python | Chromium 进程生命周期、每任务会话隔离、自动清理 |
 | `computer_use/` | 2,147 | Python + MCP | 桌面操控工具集：MCP stdio → cua-driver；SOM 截图（编号覆盖层）+ AX 树；审批回调 |
 | `plugins/browser/` | 6 文件 | Python | 云浏览器插件：browser-use / Browserbase / Firecrawl |
-| `apps/*.json` | — | JSON | 生产 COMPUTER_USE 应用记录（system_prompt 实录） |
+| `agent-runtime/browser_task.py` | 143 | FastAPI | 任务化 API：POST /tasks（SSE）、cancel、audit —— Computer Use Agent 的服务端入口 |
+| `agent-runtime/task_manager.py` | 364 | Python | 任务状态机（queued→planning→executing→waiting_user→done），20s ping，真实取消 |
+| `agent-runtime/computer_use_system.py` | 119 | Python | 提示词约束 + 工具白名单 + 危险操作拦截（支付/删除/确认）+ 单任务 30 次调用上限 |
+| `agent-runtime/browser_driver.py` | 337 | Python + httpx | CDP 确定性驱动：健康检查/标签页/导航/截图/断线重试（非 LLM 层） |
+| `agent-runtime/hermes_bridge.py` | 366 | Python | Hermes 进程桥：stdin/stdout JSON 协议（init/chat/ping/shutdown） |
+| `agent-runtime/hermes_pool.py` | 582 | Python | Hermes Agent 进程池：会话隔离、每指纹独立 workspace |
+| `apps/*.json` | — | JSON | 生产 COMPUTER_USE 应用记录（含金融示教 E2E 闭环：北向资金） |
 | `migrations/*.sql` | — | SQL | agent_app 表 DDL 与种子数据 |
 
 ## 📡 browser 工具面
@@ -218,20 +233,34 @@ sequenceDiagram
 | 按键黑名单 | 硬拦截 `Cmd+Shift+Backspace`（清空废纸篓）、`Cmd+Ctrl+Q`（锁屏）、`Cmd+Shift+Q`（登出）等，无论审批级别 |
 | 文本拦截 | `type` 动作带危险文本模式检查（fork bomb 等） |
 | Prompt 级 | 生产 system_prompt 明示：「遇到验证码或需要人工干预时暂停并告知用户」「先 snapshot 再行动」 |
+| 危险操作拦截 | `computer_use_system.py`：URL/选择器含 delete/支付/删除/确认等关键词 → 强制人工确认；金融交易表单禁止自动提交 |
+| 调用上限 | 单任务最多 30 次工具调用，超限即 FAILED（防失控循环） |
 | 平台授权 | AgentApp 走 Bearer 令牌 + 知识清单 Manifest 激活校验，未授权应用不可 invoke |
 | URL 安全 | `tools/url_safety.py` 与 CDP 白名单校验目标地址 |
 
-## 🧪 闭环测试实录
+## 🧪 闭环测试实录（示教回放机制）
 
-生产 `agent_app` 表中留有 3 条闭环测试记录（`闭环测试-1794058473` 等），真实跑通的数据已还原到 `demo/`：
+「录制流程 → 生成应用 → agent 按流程执行」的示教回放机制在生产库留有完整证据：
+
+**示教回放三步范式**（`示教回放验证应用` / `示教测试应用`）：
+
+1. 用户示教一遍操作（打开 example.com → 点击 More information... → 报告标题）
+2. 系统把示教步骤写入 system_prompt：【示教的操作步骤】段落
+3. Agent 按 SOP 顺序执行，元素找不到时用 browser_snapshot 重新定位相似元素继续
+
+**金融示教 E2E 闭环**（`E2E闭环测试-1794057996/8148/8473` 三条实录）：
 
 ```text
-起始页   data:text/html;charset=utf-8,...（内置测试页，见 demo/demo-page.html）
-SOP      1. 点击 #kw   2. 输入文本   3. 点击 #go
-断言     #out 文本 === "submitted:<输入内容>"
+起始页   data:text/html;charset=utf-8,...（内置测试页，已还原到 demo/）
+示教步骤 1. 点击「搜索关键词」（选择器 #kw）
+         2. 在输入框「搜索关键词」填入：北向资金   ← 金融场景数据
+         3. 点击「提交」（选择器 #go）
+断言     #out 文本 === "submitted:北向资金"
+执行模型 qwen-plus（a2a7c8f5e...::qwen-plus）
+最终状态 ACTIVE → ARCHIVED（测试完成后归档）
 ```
 
-测试页极简：一个输入框 + 一个把输入回显到 `#out` 的按钮 —— 专门用来验证「snapshot → 选择器定位 → 交互 → 断言」全链路，不依赖外网。
+测试页极简：一个输入框 + 一个把输入回显到 `#out` 的按钮 —— 专门验证「snapshot → 选择器定位 → 交互 → 断言」全链路，不依赖外网。完整任务状态机与审计见 `ontomind-app/agent-runtime/`。
 
 ## 📚 文档
 

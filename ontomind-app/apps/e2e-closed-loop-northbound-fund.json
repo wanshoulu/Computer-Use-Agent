@@ -1,0 +1,10 @@
+{
+  "id": "24a3e4a2-1d24-4487-b88d-db08e3c843b5",
+  "name": "E2E闭环测试-1794057996",
+  "type": "COMPUTER_USE",
+  "status": "ACTIVE→ARCHIVED（测试归档）",
+  "modelKey": "a2a7c8f5e-3b4d-4e6a-9c8b-1f2e3d4a5b6c::qwen-plus",
+  "systemPrompt": "你是一个网页自动化应用，按照以下用户示教的步骤顺序操作网页完成固定任务。尽量按步骤执行；如果某一步元素找不到或页面结构变化，用 browser_snapshot 重新定位相似元素并继续；遇到验证码或登录页时暂停并告知用户。\n\n【示教的操作步骤】\n0. 打开起始页 data:text/html;charset=utf-8,...（demo 页）\n1. 点击「搜索关键词」（选择器 #kw）\n2. 在输入框「搜索关键词」填入：北向资金\n3. 点击「提交」（选择器 #go）",
+  "demoPage": "<body style=\"margin:0;font:16px sans-serif\">\n<div id=\"out\" style=\"padding:8px;background:#eef\">ready</div>\n<input id=\"kw\" placeholder=\"搜索关键词\" style=\"display:block;margin:16px;width:260px;height:32px\">\n<button id=\"go\" style=\"display:block;margin:16px;width:120px;height:36px\"\n onclick=\"document.getElementById('out').textContent='submitted:'+document.getElementById('kw').value\">提交</button>\n</body>",
+  "source": "PostgreSQL WAL pg_wal/000000010000000000000006 实录还原"
+}
