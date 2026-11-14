@@ -17,8 +17,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from src.ontomind_agent.services.task_manager import get_task_manager, TaskState
-from src.ontomind_agent.utils.logger import logger
+from cua_server.services.task_manager import get_task_manager, TaskState
+from cua_server.utils.logger import logger
 
 router = APIRouter()
 
@@ -137,7 +137,7 @@ async def list_tasks():
 @router.get("/tasks/{task_id}/audit")
 async def get_audit_log(task_id: str):
     """获取任务的审计日志"""
-    from src.ontomind_agent.services.task_policy import get_audit_logger
+    from cua_server.services.task_policy import get_audit_logger
     audit = get_audit_logger()
     entries = audit.get_entries(task_id=task_id, limit=100)
     return {"task_id": task_id, "entries": entries, "total": len(entries)}

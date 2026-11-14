@@ -6,7 +6,7 @@ Hermes Agent Pool — 持久化 AIAgent 进程池
 后续请求 0ms 初始化开销。
 
 架构:
-  ontomind-agent (我们的 Python venv)
+  Hermes venv (bridged Python agent)
     └── HermesAgentPool (本模块)
          └── asyncio.subprocess → hermes_bridge.py (Hermes venv)
               └── AIAgent (持久化，可复用）
@@ -29,7 +29,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Optional, Dict, AsyncGenerator
 
-from src.ontomind_agent.utils.logger import logger
+from cua_server.utils.logger import logger
 
 
 BRIDGE_SCRIPT = os.path.join(
@@ -48,9 +48,7 @@ def _find_hermes_python() -> Optional[str]:
     candidates = [
         os.path.expanduser("~/.hermes/hermes-agent/venv/bin/python"),
         os.path.expanduser("~/.hermes/hermes-agent/venv/bin/python3"),
-        "/home/ontomind/.hermes/hermes-agent/venv/bin/python",
-        "/home/ontomind/.hermes/hermes-agent/venv/bin/python3",
-    ]
+            ]
     for p in candidates:
         if os.path.isfile(p) and os.access(p, os.X_OK):
             return p
@@ -314,7 +312,7 @@ class HermesAgentPool:
         # 发送 init 命令
         init_req_id = "init_{}".format(uuid.uuid4().hex[:8])
         # P4: 使用 Computer Use 的 disabled_toolsets 配置
-        from src.ontomind_agent.services.computer_use_system import DISABLED_TOOLSETS
+        from cua_server.services.computer_use_system import DISABLED_TOOLSETS
         init_params = {
             "id": init_req_id,
             "cmd": "init",

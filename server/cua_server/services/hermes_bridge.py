@@ -2,7 +2,7 @@
 """
 Hermes Agent Bridge — 持久化 AIAgent 进程
 
-运行在 Hermes venv 中，通过 stdin/stdout JSON 协议与 ontomind-agent 服务通信。
+运行在 Hermes venv 中，通过 stdin/stdout JSON 协议与 CUA server通信。
 每行一个 JSON 对象，请求和事件均以换行符分隔。
 
 协议:

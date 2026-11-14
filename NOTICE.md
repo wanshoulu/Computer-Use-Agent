@@ -37,36 +37,37 @@ plugins/browser/firecrawl/{__init__.py, plugin.yaml, provider.py}
 UPSTREAM-METADATA.txt            # wheel METADATA 原文（版本与依赖溯源）
 ```
 
-**为什么收录**：这些模块构成本仓库主题（Computer Use Agent）的完整执行链路。收录
-是为了让读者在一个仓库里看全「工具 schema → 注册 → 执行 → 安全闸门 → 后端驱动」
-的闭环，不必在上游 20 万行仓库里检索。**如需完整发行版或最新版本，请使用上游官方
-安装脚本**（见 README 快速开始）。
+**为什么收录**：这些模块构成本工具的浏览器/桌面工具链完整闭环。收录是为了让读者
+在一个仓库里看全「工具 schema → 注册 → 执行 → 安全闸门 → 后端驱动」，不必在上游
+20 万行仓库里检索。**运行时推荐直接安装完整 Hermes 发行版**（官方安装脚本），
+本仓库摘录仅作参考与溯源。
 
 **衍生注意**：`tools/computer_use/cua_backend.py` 依赖上游另行安装的
 [cua-driver](https://github.com/trycua/cua)（MIT）。本仓库不包含 cua-driver 本体。
 
-## 2. 自研代码
+## 2. 本仓库原创代码
 
 | 目录 | 内容 | 许可 |
 |---|---|---|
-| `ontomind-app/apps/` | 生产 `agent_app` 表 COMPUTER_USE 记录还原（system_prompt、示教 SOP） | Apache-2.0 |
-| `ontomind-app/migrations/` | `agent_app` 表 DDL 摘录与 COMPUTER_USE 种子 SQL | Apache-2.0 |
-| `demo/` | 无平台依赖的 CDP 闭环 demo | Apache-2.0 |
+| `server/cua_server/routes/tasks.py` | 任务化 API：创建（SSE 事件流）/ 查询 / 订阅 / 取消 / 审计 | Apache-2.0 |
+| `server/cua_server/services/task_manager.py` | 任务状态机（queued→planning→executing→waiting_user→done）、真实取消、20s ping | Apache-2.0 |
+| `server/cua_server/services/computer_use_system.py` | 示教 SOP 提示词、browser 工具白名单、危险操作拦截（支付/删除/确认）、30 次调用上限 | Apache-2.0 |
+| `server/cua_server/services/browser_driver.py` | CDP 确定性浏览器驱动（非 LLM 层）：健康检查/标签页/导航/截图/断线重试 | Apache-2.0 |
+| `server/cua_server/services/task_policy.py` | 审计日志（AuditLogger）+ 每任务标签页绑定（TabBindingManager） | Apache-2.0 |
+| `server/cua_server/services/hermes_bridge.py` | Hermes 进程桥（stdin/stdout JSON 协议） | Apache-2.0 |
+| `server/cua_server/services/hermes_pool.py` | Hermes 进程池（会话隔离/空闲回收/崩溃重建） | Apache-2.0 |
+| `server/cua_server/services/model_config.py` | 模型凭据解析（env / providers.json） | Apache-2.0 |
+| `server/cua_server/web/index.html` | Web 控制台（聊天 + 执行时间线 + 录制流程弹窗，零依赖单文件） | Apache-2.0 |
+| `demo/` | 最小 CDP 闭环冒烟（轨迹 JSON） | Apache-2.0 |
 | `docs/` | 架构文档与截图 | Apache-2.0 |
-| `ontomind-app/agent-runtime/` | Computer Use Agent 服务端实现（8 文件 2,298 行：任务状态机 / CDP 驱动 / Hermes 进程桥 / 提示词约束与安全策略） | Apache-2.0 |
 
-自研部分的事实来源：OntoMind 智能体应用平台（AI Harbor 知识建设域）
-的生产 PostgreSQL 数据（`agent_app` 表，2026-11-12 快照）与其 Flyway migration
-（V53/V56）。
-
-**agent-runtime 的恢复说明**：这 8 个文件在本机工作区源码树中已缺失，本仓库从
-Docker 容器镜像层（`ontomind/agent:cloud`，containerd snapshot 29731，文件时间
-2026-11-04）逐字节提取恢复，与生产容器内运行的代码一致。这就是平台
-「Computer Use Agent」应用（`POST /api/v1/agent-apps/app-computer-use/invoke` 与
-`POST /agent/browser/tasks`）背后真正的服务端实现。
+**来源说明**：`server/` 下的服务端实现经过生产环境验证（含金融示教回放场景）。
+其原始版本曾部署于容器镜像中，本仓库从镜像层逐字节提取后重构为独立包
+`cua_server`——去除平台耦合、模型凭据改由环境变量 / `providers.json` 提供，
+功能行为与生产验证版本一致。
 
 ## 3. 数据说明
 
-`ontomind-app/apps/*.json` 与 `migrations/seed_computer_use_apps.sql` 中的
-system_prompt 为生产环境实录还原，仅包含应用编排配置（角色设定、示教步骤、
-安全指令），不含任何用户数据、凭据或隐私信息。
+`demo/` 与 `docs/` 中引用的示教回放记录（含金融示例「北向资金」）为真实运行
+实录的脱敏还原，仅包含任务编排配置（示教步骤、断言、执行模型），不含任何
+用户数据、凭据或隐私信息。

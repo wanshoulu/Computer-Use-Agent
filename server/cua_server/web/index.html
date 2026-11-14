@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Computer Use Agent</title>
+<style>
+:root{
+  --bg:#0f1117;--panel:#171a23;--panel2:#1e2230;--border:#2a2f3f;
+  --text:#e6e9f0;--muted:#8b93a7;--accent:#5b8cff;--accent2:#8b5cf6;
+  --ok:#34d399;--warn:#fbbf24;--err:#f87171;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;height:100vh;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:12px;padding:14px 22px;border-bottom:1px solid var(--border);background:var(--panel)}
+header .logo{font-size:17px;font-weight:700;letter-spacing:.4px}
+header .logo b{color:var(--accent)}
+header .pill{font-size:11px;padding:3px 10px;border-radius:99px;border:1px solid var(--border);color:var(--muted)}
+header .pill.ok{color:var(--ok);border-color:var(--ok)}
+header .pill.err{color:var(--err);border-color:var(--err)}
+header .spacer{flex:1}
+header a{color:var(--muted);font-size:12px;text-decoration:none}
+header a:hover{color:var(--text)}
+main{flex:1;display:flex;min-height:0}
+/* 左：会话 */
+.chat{width:420px;min-width:340px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--panel)}
+.chat .msgs{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:92%;padding:10px 14px;border-radius:12px;white-space:pre-wrap;word-break:break-word}
+.msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.msg.agent{align-self:flex-start;background:var(--panel2);border:1px solid var(--border);border-bottom-left-radius:4px}
+.msg.state{align-self:center;font-size:11px;color:var(--muted);padding:2px 10px;background:var(--bg);border-radius:99px}
+.msg.state.executing{color:var(--accent)} .msg.state.succeeded{color:var(--ok)}
+.msg.state.failed,.msg.state.cancelled{color:var(--err)}
+.chat .composer{border-top:1px solid var(--border);padding:14px;display:flex;flex-direction:column;gap:10px}
+.chat textarea{width:100%;min-height:74px;resize:vertical;background:var(--panel2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font:inherit}
+.chat textarea:focus{outline:1px solid var(--accent)}
+.chat .row{display:flex;gap:8px;align-items:center}
+.chat input{flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;font-size:12px}
+button.primary{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;font:600 13px inherit;cursor:pointer}
+button.primary:disabled{opacity:.45;cursor:not-allowed}
+button.ghost{background:transparent;color:var(--err);border:1px solid var(--err);border-radius:8px;padding:8px 14px;font:600 12px inherit;cursor:pointer;display:none}
+/* 右：执行时间线 */
+.steps{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.steps .head{padding:12px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px}
+.steps .head h2{font-size:14px;font-weight:600}
+.steps .head .taskid{font-size:11px;color:var(--muted);font-family:ui-monospace,monospace}
+.timeline{flex:1;overflow-y:auto;padding:18px 22px;display:flex;flex-direction:column;gap:10px}
+.step{display:flex;gap:12px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;animation:fadeIn .25s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.step .n{width:26px;height:26px;flex:none;border-radius:50%;background:var(--panel2);border:1px solid var(--border);display:grid;place-items:center;font-size:11px;color:var(--muted)}
+.step.running .n{border-color:var(--accent);color:var(--accent)}
+.step.success .n{border-color:var(--ok);color:var(--ok)}
+.step.error .n{border-color:var(--err);color:var(--err)}
+.step .body{flex:1;min-width:0}
+.step .t{font:600 13px ui-monospace,monospace;color:var(--text)}
+.step .p{font:11px ui-monospace,monospace;color:var(--muted);margin-top:3px;white-space:pre-wrap;word-break:break-all}
+.step .r{font-size:12px;color:var(--muted);margin-top:5px;max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-word}
+.step img{margin-top:8px;max-width:100%;border-radius:8px;border:1px solid var(--border)}
+.empty{margin:auto;color:var(--muted);font-size:13px;text-align:center;line-height:2}
+.empty code{background:var(--panel);padding:2px 8px;border-radius:6px;font-size:12px}
+/* 录制器弹层 */
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:14px;padding:22px;width:min(560px,92vw)}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+dialog h3{font-size:15px;margin-bottom:6px}
+dialog p.hint{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.7}
+.rec-step{display:flex;gap:8px;margin-bottom:8px}
+.rec-step input{flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;font:12px ui-monospace,monospace}
+.rec-step .sel{width:110px;flex:none}
+dialog .acts{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+button.mini{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer}
+button.mini:hover{border-color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">Computer <b>Use</b> Agent</span>
+  <span class="pill" id="browserPill">浏览器检测中…</span>
+  <span class="spacer"></span>
+  <button class="mini" onclick="recDlg.showModal()">⚙︎ 录制流程</button>
+  <a href="/docs" target="_blank">API 文档</a>
+</header>
+<main>
+  <section class="chat">
+    <div class="msgs" id="msgs">
+      <div class="msg agent">给我一个网页任务，我会用 CDP 连接的 Chrome 自动完成。<br>示例：<b>打开 example.com，点击 More information 链接，报告新页面标题</b></div>
+    </div>
+    <div class="composer">
+      <textarea id="goal" placeholder="描述任务…（或点上方「录制流程」生成示教 SOP）"></textarea>
+      <div class="row">
+        <input id="modelKey" placeholder="模型 key，如 dashscope::qwen-plus" value="dashscope::qwen-plus">
+        <button class="primary" id="goBtn" onclick="runTask()">▶ 执行</button>
+        <button class="ghost" id="cancelBtn" onclick="cancelTask()">■ 取消</button>
+      </div>
+    </div>
+  </section>
+  <section class="steps">
+    <div class="head">
+      <h2>执行时间线</h2>
+      <span class="taskid" id="taskId"></span>
+      <span class="spacer" style="flex:1"></span>
+      <span class="pill" id="statePill">idle</span>
+    </div>
+    <div class="timeline" id="timeline">
+      <div class="empty">任务开始后，这里实时显示每一步工具调用<br><code>browser_navigate → browser_snapshot → browser_click → …</code><br>每步附带执行前后截图</div>
+    </div>
+  </section>
+</main>
+
+<dialog id="recDlg">
+  <h3>录制流程 → 生成示教 SOP</h3>
+  <p class="hint">把你在页面上要做的操作按顺序登记为步骤（动作 + 目标选择器 + 填写内容）。生成后作为示教步骤注入任务，agent 将按顺序执行，元素找不到时会用 snapshot 重新定位。</p>
+  <div id="recSteps">
+    <div class="rec-step">
+      <input class="sel" value="click"  placeholder="动作">
+      <input placeholder="选择器或描述，如 #kw / 「More information」链接">
+      <input placeholder="填写内容（可选）">
+    </div>
+  </div>
+  <div style="text-align:left"><button class="mini" onclick="addRecStep()">＋ 加一步</button></div>
+  <div class="acts">
+    <button class="mini" onclick="recDlg.close()">取消</button>
+    <button class="primary" onclick="genSop()">生成 SOP 填入任务</button>
+  </div>
+</dialog>
+
+<script>
+const $ = id => document.getElementById(id);
+const API = '';  // 同源
+let currentTask = null, evtSource = null, stepNo = 0;
+
+// ── 健康检查 ──
+fetch('/health').then(r=>r.json()).then(h=>{
+  const pill=$('browserPill');
+  if(h.browser?.ok){pill.textContent='Chrome CDP 已连接 · '+h.browser.pages+' 页';pill.className='pill ok'}
+  else{pill.textContent='Chrome CDP 未连接 ('+(h.browser?.error||'no CDP_URL')+')';pill.className='pill err'}
+}).catch(()=>{ $('browserPill').textContent='服务不可达';$('browserPill').className='pill err' });
+
+// ── 消息区 ──
+function addMsg(cls, text){
+  const d=document.createElement('div');d.className='msg '+cls;d.textContent=text;
+  $('msgs').appendChild(d);$('msgs').scrollTop=1e9;return d;
+}
+// ── 时间线 ──
+function addStep(state, tool, params, result, shotBefore, shotAfter){
+  if(stepNo===0) $('timeline').innerHTML='';
+  stepNo++;
+  const d=document.createElement('div');d.className='step '+state;
+  let html=`<div class="n">${stepNo}</div><div class="body"><div class="t">${tool}</div>`;
+  if(params) html+=`<div class="p">${esc(params)}</div>`;
+  if(result) html+=`<div class="r">${esc(result).slice(0,600)}</div>`;
+  if(shotAfter) html+=`<img src="data:image/png;base64,${shotAfter}">`;
+  html+='</div>';d.innerHTML=html;
+  $('timeline').appendChild(d);$('timeline').scrollTop=1e9;
+}
+const esc = s => String(s??'').replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+// ── 执行任务 ──
+async function runTask(){
+  const message=$('goal').value.trim();
+  if(!message) return;
+  const model=$('modelKey').value.trim()||'dashscope::qwen-plus';
+  addMsg('user',message);$('goal').value='';
+  $('goBtn').disabled=true;$('cancelBtn').style.display='inline-block';
+  $('timeline').innerHTML='';stepNo=0;$('taskId').textContent='';
+  setState('queued');
+
+  const resp=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message,model})});
+  if(!resp.ok||!resp.body){ addMsg('agent','创建任务失败: '+resp.status);reset();return; }
+
+  currentTask=(await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,model})}));
+  // SSE 消费
+  const reader=resp.body.getReader();const dec=new TextDecoder();let buf='';
+  while(true){
+    const {done,value}=await reader.read();if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    let i;while((i=buf.indexOf('\n'))>=0){
+      const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
+      if(!line)continue;
+      let ev;try{ev=JSON.parse(line)}catch{continue}
+      handleEvent(ev);
+    }
+  }
+  reset();
+}
+function handleEvent(ev){
+  switch(ev.type){
+    case 'state':
+      setState(ev.state);$('taskId').textContent=ev.task_id||'';
+      addMsg('state '+ev.state, {queued:'任务排队',planning:'规划中…',executing:'执行中…',
+        waiting_user:'等待用户确认',succeeded:'✅ 完成',failed:'❌ 失败',cancelled:'已取消'}[ev.state]||ev.state);
+      if(ev.state==='succeeded'||ev.state==='failed'||ev.state==='cancelled') reset(true);
+      break;
+    case 'tool_start': addStep('running',ev.name||ev.tool_name||'',ev.args||ev.params||'');break;
+    case 'tool_end':{
+      const ok=(ev.status||'success')!=='error';
+      addStep(ok?'success':'error',ev.name||ev.tool_name||'',null,
+        ev.result||ev.error||'', null, ev.screenshot);
+      break;}
+    case 'thinking': break;
+    case 'result':
+      if(ev.response) addMsg('agent',ev.response);
+      if(ev.screenshot) addStep('success','final screenshot',null,null,null,ev.screenshot);
+      break;
+    case 'error':
+      addMsg('agent','⚠ '+ (ev.error||'未知错误'));break;
+  }
+}
+function setState(s){$('statePill').textContent=s}
+function reset(keep){
+  $('goBtn').disabled=false;
+  if(!keep) $('cancelBtn').style.display='none';
+  currentTask=null;
+}
+async function cancelTask(){
+  if(!$('taskId').textContent)return;
+  await fetch(`/api/tasks/${$('taskId').textContent}/cancel`,{method:'POST'});
+  addMsg('state','取消请求已发送');
+}
+
+// ── 录制器 ──
+function addRecStep(){
+  const d=document.createElement('div');d.className='rec-step';
+  d.innerHTML=`<input class="sel" value="click" placeholder="动作"><input placeholder="选择器或描述"><input placeholder="填写内容（可选）">`;
+  $('recSteps').appendChild(d);
+}
+function genSop(){
+  const steps=[...$('recSteps').querySelectorAll('.rec-step')]
+    .map(r=>[...r.querySelectorAll('input')].map(i=>i.value.trim()))
+    .filter(([a])=>a);
+  if(!steps.length){recDlg.close();return}
+  const lines=steps.map(([a,t,v],i)=>{
+    let s=`${i+1}. ${a==='click'?'点击':a==='type'?'在输入框填入':a==='goto'?'打开页面':a}「${t}」`;
+    if(v) s+=`：${v}`;
+    if(t&&t.startsWith('#')||t&&t.startsWith('.')) s+=`（选择器 ${t}）`;
+    return s;
+  });
+  $('goal').value=`【示教的操作步骤】\n${lines.join('\n')}\n\n请严格按以上步骤操作网页完成任务。`;
+  recDlg.close();
+}
+</script>
+</body>
+</html>

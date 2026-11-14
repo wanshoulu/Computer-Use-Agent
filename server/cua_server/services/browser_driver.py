@@ -20,7 +20,7 @@ from typing import Optional, Dict, List, Any
 
 import httpx
 
-from src.ontomind_agent.utils.logger import logger
+from cua_server.utils.logger import logger
 
 
 def _get_cdp_http_base() -> str:

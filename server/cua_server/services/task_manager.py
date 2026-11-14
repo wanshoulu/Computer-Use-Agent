@@ -23,7 +23,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, List, AsyncGenerator, Any
 
-from src.ontomind_agent.utils.logger import logger
+from cua_server.utils.logger import logger
 
 
 class TaskState(str, Enum):
@@ -120,7 +120,7 @@ class TaskManager:
         """创建新任务并异步启动执行"""
         # P4: 如果未指定 system_prompt，使用 Computer Use 默认提示词
         if not system_prompt:
-            from src.ontomind_agent.services.computer_use_system import get_system_prompt
+            from cua_server.services.computer_use_system import get_system_prompt
             system_prompt = get_system_prompt(message)
 
         task_id = f"task_{uuid.uuid4().hex[:12]}"
@@ -151,8 +151,8 @@ class TaskManager:
                 return
 
             # 解析模型配置
-            from src.ontomind_agent.routes.hermes import _resolve_model_config, _write_hermes_config
-            model_config = await _resolve_model_config(task.model)
+            from cua_server.services.model_config import resolve_model_config, write_hermes_config
+            model_config = await resolve_model_config(task.model)
             if not model_config or not model_config.get("api_key"):
                 task.state = TaskState.FAILED
                 task.error = f"模型配置无效: {task.model}"
@@ -160,13 +160,13 @@ class TaskManager:
                 task.push_event({"type": "done", "state": "failed", "task_id": task.task_id})
                 return
 
-            _write_hermes_config(model_config)
+            write_hermes_config(model_config)
 
             task.state = TaskState.EXECUTING
             task.push_event({"type": "state", "state": "executing", "task_id": task.task_id})
 
             # 通过 HermesAgentPool 执行对话
-            from src.ontomind_agent.services.hermes_pool import get_hermes_pool
+            from cua_server.services.hermes_pool import get_hermes_pool
             pool = get_hermes_pool()
 
             full_response_parts = []
@@ -191,7 +191,7 @@ class TaskManager:
                 if event_type == "tool_start":
                     tool_call_count += 1
                     # P4: 工具调用上限约束
-                    from src.ontomind_agent.services.computer_use_system import MAX_TOOL_CALLS_PER_TASK
+                    from cua_server.services.computer_use_system import MAX_TOOL_CALLS_PER_TASK
                     if tool_call_count > MAX_TOOL_CALLS_PER_TASK:
                         task.state = TaskState.FAILED
                         task.error = f"工具调用次数超限 ({MAX_TOOL_CALLS_PER_TASK})"
@@ -206,7 +206,7 @@ class TaskManager:
                     )
                     task.steps.append(step)
                     # P6: 审计日志
-                    from src.ontomind_agent.services.task_policy import get_audit_logger
+                    from cua_server.services.task_policy import get_audit_logger
                     get_audit_logger().log(
                         task_id=task.task_id,
                         action="tool_start",

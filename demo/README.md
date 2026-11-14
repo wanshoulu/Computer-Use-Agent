@@ -1,6 +1,6 @@
 # 闭环 Demo
 
-不依赖 OntoMind 平台，用一个内置测试页验证 Computer Use Agent 的完整闭环：
+不依赖后端服务，用一个内置测试页验证 CDP 闭环的最小形态（完整服务端见 `server/`）：
 
 ```text
 启动 Chrome（CDP）→ 打开测试页 → browser_snapshot → 按 SOP 交互 → 断言 → 输出轨迹

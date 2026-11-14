@@ -17,8 +17,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Dict, List
 
-from src.ontomind_agent.services.computer_use_system import is_dangerous_action, DANGEROUS_PATTERNS
-from src.ontomind_agent.utils.logger import logger
+from cua_server.services.computer_use_system import is_dangerous_action, DANGEROUS_PATTERNS
+from cua_server.utils.logger import logger
 
 
 # ── 敏感信息脱敏 ────────────────────────────────────────────────────
@@ -182,7 +182,7 @@ class TabBindingManager:
         Returns:
             TabBinding 或 None（创建失败时）
         """
-        from src.ontomind_agent.services.browser_driver import get_browser_driver
+        from cua_server.services.browser_driver import get_browser_driver
         driver = get_browser_driver()
 
         tab = await driver.create_tab(url)
@@ -213,7 +213,7 @@ class TabBindingManager:
         if binding is None:
             return False
 
-        from src.ontomind_agent.services.browser_driver import get_browser_driver
+        from cua_server.services.browser_driver import get_browser_driver
         driver = get_browser_driver()
 
         success = await driver.close_tab(binding.tab_id)

@@ -8,9 +8,9 @@ Computer Use Agent = 「可访问性树优先的网页/桌面自动化智能体�
 browser_snapshot (文本快照) → 模型决策 → browser_click/type/eval → 结果回灌 → 再 snapshot
 ```
 
-本仓库主题来自 OntoMind 平台生产环境的 `COMPUTER_USE` 类型 AgentApp（应用管理页
-可见的「Computer Use Agent」卡片），执行器为 Hermes Agent 的 browser/computer_use
-工具集，浏览器经 Chrome DevTools Protocol（CDP）接入。
+本工具的服务端实现（任务状态机 / CDP 驱动 / 进程桥 / 安全约束）来自生产环境
+验证过的同名系统（从容器镜像恢复，见 NOTICE.md），浏览器工具面来自 Hermes Agent
+browser/computer_use 工具集，浏览器经 Chrome DevTools Protocol（CDP）接入。
 
 ## 2. 名词表
 
@@ -52,8 +52,8 @@ click by element index instead of pixel coordinates」。
 
 ### 3.3 应用编排放 system_prompt，不放代码
 
-**决策**：OntoMind 的 AgentApp 把「角色设定 + 示教 SOP + 安全边界」全部写在
-`agent_app.system_prompt`（TEXT 字段），执行器零改动。
+**决策**：把「角色设定 + 示教 SOP + 安全边界」全部写进任务的 system_prompt
+（随任务下发），执行器零改动。
 
 **代价**：prompt 是运行时行为的一部分，版本化只能靠 `agent_app.version` 字段与快照表（`application_knowledge_manifest`），没有代码级 diff。
 
@@ -83,13 +83,12 @@ click by element index instead of pixel coordinates」。
 
 ## 5. 已知限制（诚实列出）
 
-1. **上游代码未升级**：摘录自 v0.16.0（2026-06）。上游已发布跨平台 computer_use（Windows/Linux）等新特性，本仓库摘录版本的 `cua_backend.py` 文档注释仍标 macOS-only；生产环境实际通过 `browser_*` 路线在 Windows 上运行，未验证 computer_use 的 Windows 后端。
-2. **摘录非完整发行版**：`hermes-agent/` 仅收录 Computer Use/Browser 链路相关文件，缺 agent loop、provider 适配等外围模块，不能直接 `pip install` 运行 —— 请用上游官方安装脚本装完整 Hermes，本仓库的价值在「链路讲解 + 生产编排资产 + demo」。
-3. **Server 端 invoke 语义有限**：OntoMind `KnowledgeQaExecutionService.invoke` 目前面向 KNOWLEDGE_QA 语义（知识库检索 + 问答）；COMPUTER_USE 应用的实际执行走 Hermes 运行时，`POST /agent-apps/{id}/invoke` 的 COMPUTER_USE 分支在平台 server 侧未见专属实现（生产通过配置驱动）。复刻平台形态时需要自行接执行器。
-4. **闭环 demo 的 browser 依赖**：demo 需要本机 Chrome 且以 `--remote-debugging-port` 启动；无头 Linux 环境建议改用上游 `agent-browser install` 的托管 Chromium。
-5. **验证码**：生产策略是「检测到即暂停并告知用户」，未集成打码/人工接管通道。
-6. **数据时效**：`agent_app` 记录还原自 2026-11-12 的 PostgreSQL 快照，之后平台上的修改不反映在本仓库。
-
+1. **上游代码未升级**：摘录自 v0.16.0（2026-06）。上游已发布跨平台 computer_use（Windows/Linux）等新特性，本仓库摘录版本的 `cua_backend.py` 文档注释仍标 macOS-only；生产环境实际通过 `browser_*` 路线运行，未验证 computer_use 的 Windows 后端。
+2. **Hermes 依赖为运行时外置**：`hermes_bridge.py`/`hermes_pool.py` 通过子进程桥接 Hermes venv 里的 `AIAgent`（`~/.hermes/hermes-agent/venv`），需先安装 Hermes Agent（官方安装脚本）。没有 Hermes 时 `browser_driver.py`（纯 CDP 确定性层）仍可独立工作，但失去 LLM 自主决策能力。
+3. **示教 SOP 是文本编排**：录制流程当前以「动作/目标/内容」三列表单生成（Web 控制台「录制流程」弹窗），尚未实现浏览器内可视化录制（点击页面元素自动记录）。计划中的可视化录制器可直接基于 openjiuwen browser_move 的 playwright_runtime 或 Chrome 扩展实现。
+4. **验证码**：策略是「检测到即暂停并告知用户」（任务进入 waiting_user），未集成打码/人工接管通道。
+5. **单机并发上限**：Hermes 进程池默认 max_bridges=3、单模型信号量串行；高并发需横向扩容 worker。
+6. **截图 token 成本**：browser_vision / SOM 截图走视觉模型时 token 开销显著；文本快照（ariaSnapshot）优先的路线可规避大部分成本，但依赖页面可访问性树质量。
 ## 6. 与同类实现的对比
 
 | 维度 | 本方案（Hermes browser_*） | Anthropic computer_20251124 | 纯视觉 CUA（pyautogui 系） |
