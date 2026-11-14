@@ -4,6 +4,7 @@
 
 **Teach once, replay forever — 可示教回放的网页自动化 Agent（CDP + Hermes 双执行层）**
 
+[![CI](https://github.com/wanshoulu/Computer-Use-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/wanshoulu/Computer-Use-Agent/actions/workflows/ci.yml)
 [![Upstream](https://img.shields.io/badge/browser%2Fcomputer__use-NousResearch%2Fhermes--agent%20v0.16.0-blue)](https://github.com/NousResearch/hermes-agent)
 [![License](https://img.shields.io/badge/license-MIT%20(upstream)%20%2B%20Apache--2.0%20(this%20repo)-green)](LICENSE)
 [![Server](https://img.shields.io/badge/server-FastAPI%20%2B%20SSE%20task%20lifecycle-009688)](#-quick-start)

@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+    branches: [main]
+    paths: ['demo/**', 'server/**', '.github/workflows/ci.yml']
+  pull_request:
+    paths: ['demo/**', 'server/**', '.github/workflows/ci.yml']
+jobs:
+  demo-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Chrome
+        run: |
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update && sudo apt-get install -y google-chrome-stable
+      - run: pip install websockets
+      - name: Run CDP closed-loop smoke test
+        run: |
+          python demo/run_demo.py \
+            --chrome /usr/bin/google-chrome \
+            --cdp-port 9222
+      - name: Server import check
+        run: |
+          cd server
+          pip install fastapi uvicorn pydantic httpx websockets PyYAML loguru tenacity
+          python -c "import sys; sys.path.insert(0,'.'); from cua_server.app import app; print('server import OK')"
