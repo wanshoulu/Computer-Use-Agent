@@ -9,3 +9,4 @@ server/logs/
 .shot-*/
 docs/.shot-*/
 docs/frames/
+.gif-prof/
