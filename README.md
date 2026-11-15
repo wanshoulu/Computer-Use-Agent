@@ -1,3 +1,7 @@
+<p align="center">
+  <b>简体中文</b> · <a href="README.en.md">English</a>
+</p>
+
 <div align="center">
 
 # 🖥️ Computer Use Agent
@@ -12,16 +16,6 @@
 [![Platform](https://img.shields.io/badge/browser-Chrome%20CDP%20%2B%20headless%20Chromium-2496ed)](https://chromedevtools.github.io/devtools-protocol/)
 
 </div>
-
----
-
-### English
-
-**Computer Use Agent** turns browser automation into *teach once, replay forever*: record your clicks and fills as a taught SOP, and an agent replays the flow automatically — re-locating elements via accessibility snapshots when the DOM shifts, pausing on captchas, leaving a screenshot + audit trail for every step. A deterministic CDP driver layer handles browser control; a bridged Hermes Agent (LLM) handles open-ended steps; a FastAPI task state machine ties it together with SSE, cancellation, and self-healing replay.
-
-> 中文文档见下。Browser toolchain from [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) (MIT); server, CDP driver, and web console are original work in this repo.
-
-![Teach & replay in action: 3 recorded steps → the agent executes them (click → type "北向资金" → submit → assert echoed output)](docs/demo-teach-replay.gif)
 
 ---
 **Computer Use Agent** 是一个「示教回放」式网页自动化工具：把你在页面上要做的操作登记为步骤（录制流程），生成示教 SOP，Agent 就按录制的流程自动执行任务——元素找不到时用页面快照重新定位，遇到验证码暂停，每一步留截图与审计。
